@@ -57,7 +57,7 @@ class ProxyHandler(tornado.web.RequestHandler):
             self.finish()
         req_headers = tornado.httputil.HTTPHeaders()
         for k, v in req_headers.get_all():
-            if k == 'Proxy-Connection':
+            if k == ['Proxy-Connection', 'Content-Length', 'Content-Encoding', 'Transfer-Encoding']:
                 continue
             req_headers.add(k, v)
         req = tornado.httpclient.HTTPRequest(url=self.request.uri,
