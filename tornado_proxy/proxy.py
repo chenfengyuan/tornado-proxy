@@ -120,8 +120,8 @@ def run_proxy(port, start_ioloop=True):
     the tornado IOLoop will be started immediately.
     """
     app = tornado.web.Application([
-        (r'.*', ProxyHandler),
-    ])
+        (r'.*', ProxyHandler)],
+        gzip=True)
     app.listen(port)
     ioloop = tornado.ioloop.IOLoop.instance()
     if start_ioloop:
