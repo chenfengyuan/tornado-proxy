@@ -33,6 +33,7 @@ import tornado.ioloop
 import tornado.iostream
 import tornado.web
 import tornado.httpclient
+import tornado.httputil
 
 __all__ = ['ProxyHandler', 'run_proxy']
 
@@ -44,25 +45,25 @@ class ProxyHandler(tornado.web.RequestHandler):
     def get(self):
 
         def handle_response(response):
-            if response.error and not isinstance(response.error,
-                    tornado.httpclient.HTTPError):
+            if response.error and not isinstance(response.error, tornado.httpclient.HTTPError):
                 self.set_status(500)
                 self.write('Internal server error:\n' + str(response.error))
             else:
                 self.set_status(response.code)
-                for header in ('Date', 'Cache-Control', 'Server',
-                        'Content-Type', 'Location'):
-                    v = response.headers.get(header)
-                    if v:
-                        self.set_header(header, v)
+                for k1, v1 in response.headers.get_all():
+                    self.set_header(k1, v1)
                 if response.body:
                     self.write(response.body)
             self.finish()
-
+        req_headers = tornado.httputil.HTTPHeaders()
+        for k, v in req_headers.get_all():
+            if k == 'Proxy-Connection':
+                continue
+            req_headers.add(k, v)
         req = tornado.httpclient.HTTPRequest(url=self.request.uri,
-            method=self.request.method, body=self.request.body,
-            headers=self.request.headers, follow_redirects=False,
-            allow_nonstandard_methods=True)
+                                             method=self.request.method, body=self.request.body,
+                                             headers=req_headers, follow_redirects=False,
+                                             allow_nonstandard_methods=True)
 
         client = tornado.httpclient.AsyncHTTPClient()
         try:
@@ -81,7 +82,7 @@ class ProxyHandler(tornado.web.RequestHandler):
 
     @tornado.web.asynchronous
     def connect(self):
-        host, port = self.request.uri.split(':')
+        host, port_ = self.request.uri.split(':')
         client = self.request.connection.stream
 
         def read_from_client(data):
@@ -111,10 +112,10 @@ class ProxyHandler(tornado.web.RequestHandler):
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         upstream = tornado.iostream.IOStream(s)
-        upstream.connect((host, int(port)), start_tunnel)
+        upstream.connect((host, int(port_)), start_tunnel)
 
 
-def run_proxy(port, start_ioloop=True):
+def run_proxy(port_, start_ioloop=True):
     """
     Run proxy on the specified port. If start_ioloop is True (default),
     the tornado IOLoop will be started immediately.
@@ -122,7 +123,7 @@ def run_proxy(port, start_ioloop=True):
     app = tornado.web.Application([
         (r'.*', ProxyHandler)],
         gzip=True)
-    app.listen(port)
+    app.listen(port_)
     ioloop = tornado.ioloop.IOLoop.instance()
     if start_ioloop:
         ioloop.start()
